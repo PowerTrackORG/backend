@@ -1,0 +1,20 @@
+spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/powertrack}
+    username: ${SPRING_DATASOURCE_USERNAME:powertrack}
+    password: ${SPRING_DATASOURCE_PASSWORD:powertrack}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
+
+jwt:
+  # Solo para desarrollo local. En cualquier otro ambiente esto DEBE venir de una variable de entorno real.
+  secret: ${JWT_SECRET:dev-only-insecure-secret-change-me-please-32chars-min}
+  access-token-expiration-minutes: 15
+  refresh-token-expiration-days: 30
+
+server:
+  port: ${SERVER_PORT:8080}

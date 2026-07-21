@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: powertrack-postgres
+    environment:
+      POSTGRES_DB: powertrack
+      POSTGRES_USER: powertrack
+      POSTGRES_PASSWORD: powertrack
+    ports:
+      - "5432:5432"
+    volumes:
+      - powertrack_pgdata:/var/lib/postgresql/data
+
+volumes:
+  powertrack_pgdata:

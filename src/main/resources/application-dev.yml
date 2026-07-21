@@ -17,4 +17,6 @@ jwt:
   refresh-token-expiration-days: 30
 
 server:
-  port: ${SERVER_PORT:8080}
+  # 8080 default cambiado a 8081: en esta máquina de desarrollo el 8080 lo ocupa
+  # un servicio de Jenkins corriendo aparte. Sigue siendo override-able con SERVER_PORT.
+  port: ${SERVER_PORT:8081}

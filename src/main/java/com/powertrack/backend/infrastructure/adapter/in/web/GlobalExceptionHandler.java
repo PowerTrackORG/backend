@@ -4,6 +4,10 @@ import com.powertrack.backend.application.auth.exception.EmailAlreadyRegisteredE
 import com.powertrack.backend.application.auth.exception.InvalidCredentialsException;
 import com.powertrack.backend.application.routine.exception.ExerciseNotFoundException;
 import com.powertrack.backend.application.routine.exception.RoutineNotFoundException;
+import com.powertrack.backend.application.workout.exception.RoutineDayNotFoundException;
+import com.powertrack.backend.application.workout.exception.RoutineExerciseNotFoundException;
+import com.powertrack.backend.application.workout.exception.WorkoutSessionAlreadyFinishedException;
+import com.powertrack.backend.application.workout.exception.WorkoutSessionNotFoundException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -36,6 +40,26 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ExerciseNotFoundException.class)
     public ResponseEntity<Map<String, Object>> handleExerciseNotFound(ExerciseNotFoundException ex) {
         return errorResponse(HttpStatus.NOT_FOUND, ex.getMessage());
+    }
+
+    @ExceptionHandler(WorkoutSessionNotFoundException.class)
+    public ResponseEntity<Map<String, Object>> handleWorkoutSessionNotFound(WorkoutSessionNotFoundException ex) {
+        return errorResponse(HttpStatus.NOT_FOUND, ex.getMessage());
+    }
+
+    @ExceptionHandler(RoutineDayNotFoundException.class)
+    public ResponseEntity<Map<String, Object>> handleRoutineDayNotFound(RoutineDayNotFoundException ex) {
+        return errorResponse(HttpStatus.NOT_FOUND, ex.getMessage());
+    }
+
+    @ExceptionHandler(RoutineExerciseNotFoundException.class)
+    public ResponseEntity<Map<String, Object>> handleRoutineExerciseNotFound(RoutineExerciseNotFoundException ex) {
+        return errorResponse(HttpStatus.NOT_FOUND, ex.getMessage());
+    }
+
+    @ExceptionHandler(WorkoutSessionAlreadyFinishedException.class)
+    public ResponseEntity<Map<String, Object>> handleWorkoutSessionAlreadyFinished(WorkoutSessionAlreadyFinishedException ex) {
+        return errorResponse(HttpStatus.CONFLICT, ex.getMessage());
     }
 
     @ExceptionHandler(IllegalArgumentException.class)

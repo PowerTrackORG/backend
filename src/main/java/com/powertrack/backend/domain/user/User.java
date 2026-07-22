@@ -62,6 +62,15 @@ public final class User {
         return createdAt;
     }
 
+    /**
+     * Devuelve una nueva instancia inmutable con el {@code sportGoal} actualizado,
+     * preservando el resto de atributos (RF de edición de objetivo deportivo).
+     */
+    public User withSportGoal(SportGoal newSportGoal) {
+        Objects.requireNonNull(newSportGoal, "sportGoal es obligatorio");
+        return new User(id, email, passwordHash, fullName, newSportGoal, createdAt);
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;

@@ -5,6 +5,7 @@ import com.powertrack.backend.domain.user.User;
 import org.springframework.stereotype.Component;
 
 import java.util.Optional;
+import java.util.UUID;
 
 @Component
 public class UserPersistenceAdapter implements UserRepositoryPort {
@@ -27,6 +28,11 @@ public class UserPersistenceAdapter implements UserRepositoryPort {
     @Override
     public Optional<User> findByEmail(String email) {
         return jpaRepository.findByEmail(email).map(this::toDomain);
+    }
+
+    @Override
+    public Optional<User> findById(UUID id) {
+        return jpaRepository.findById(id).map(this::toDomain);
     }
 
     @Override

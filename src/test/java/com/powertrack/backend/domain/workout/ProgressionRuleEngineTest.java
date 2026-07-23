@@ -126,10 +126,19 @@ class ProgressionRuleEngineTest {
         }
 
         @Test
-        void rpeSeisNoCalificaParaAumentarReps() {
+        void rpeSeisTambienCalificaParaAumentarReps() {
+            // Desde 2026-07-23: RPE bajo (<=8) con reps en rango ya no cae en el gap por
+            // defecto (Mantener) — el usuario tiene margen real para sumar repeticiones.
             var sets = List.of(set(100, 10, 6));
             var result = engine.evaluate(input(sets, OverallFeeling.BUENA));
-            assertThat(result).isNotEqualTo(Recommendation.INCREASE_REPS);
+            assertThat(result).isEqualTo(Recommendation.INCREASE_REPS);
+        }
+
+        @Test
+        void rpeUnoTambienCalificaParaAumentarReps() {
+            var sets = List.of(set(100, 10, 1));
+            var result = engine.evaluate(input(sets, OverallFeeling.BUENA));
+            assertThat(result).isEqualTo(Recommendation.INCREASE_REPS);
         }
 
         @Test

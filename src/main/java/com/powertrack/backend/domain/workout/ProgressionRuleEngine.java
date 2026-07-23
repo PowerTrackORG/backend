@@ -46,7 +46,9 @@ import java.math.BigDecimal;
  *   condiciones de ninguna regla (ej. RPE bajo, sensación buena), ninguna de las 5 reglas
  *   aplica literalmente. Se documenta como gap y se usa {@link Recommendation#MAINTAIN}
  *   como valor por defecto más seguro, en vez de inventar un criterio nuevo no solicitado.
- *   Señalado explícitamente para que producto decida si esto merece una regla 6.</li>
+ *   Señalado explícitamente para que producto decida si esto merece una regla 6. (Nota:
+ *   esto es distinto del caso de RPE bajo con reps ya dentro de rango, que la Regla 2
+ *   cubre explícitamente desde 2026-07-23 — ver más abajo.)</li>
  * </ul>
  */
 public final class ProgressionRuleEngine {
@@ -90,13 +92,21 @@ public final class ProgressionRuleEngine {
 
     /**
      * Regla 2: Mantener Peso y Aumentar Repeticiones. target_min &lt;= R_done &lt;
-     * target_max Y RPE en {7, 8}.
+     * target_max Y RPE &lt;= 8.
+     * <p>
+     * Extendida a todo RPE &lt;= 8 (antes solo {7, 8}, ver
+     * {@code Docs/decisiones-tecnicas.md}, entrada 2026-07-23): un RPE bajo (1-6) con reps
+     * ya dentro del rango objetivo significa que el usuario tiene margen real para sumar
+     * repeticiones, no que deba "mantener". Dejarlo en el gap por defecto (Regla 3)
+     * contradecía el objetivo del producto (sobrecarga progresiva) siempre que el esfuerzo
+     * fuera cómodo. El mismo techo RPE &lt;= 8 que ya usa la Regla 1 se reutiliza aquí por
+     * consistencia.
      */
     private boolean appliesIncreaseReps(ExerciseEvaluationInput input) {
         int minReps = minReps(input);
         int maxRpe = maxRpe(input);
         boolean repsInRange = minReps >= input.targetRepMin() && minReps < input.targetRepMax();
-        return repsInRange && (maxRpe == 7 || maxRpe == 8);
+        return repsInRange && maxRpe <= 8;
     }
 
     /**

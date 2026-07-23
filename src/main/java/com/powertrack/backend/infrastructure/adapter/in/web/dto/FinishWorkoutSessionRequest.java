@@ -12,17 +12,24 @@ import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * {@code endTime} lo reporta el cliente (no el servidor), mismo criterio que
+ * {@code StartWorkoutSessionRequest#startTime} — sin validación de rango, decisión
+ * explícita de producto.
+ */
 public record FinishWorkoutSessionRequest(
         @NotNull OverallFeeling overallFeeling,
-        @NotEmpty @Valid List<ExerciseLogRequest> exerciseLogs
+        @NotEmpty @Valid List<ExerciseLogRequest> exerciseLogs,
+        @NotNull Instant endTime
 ) {
 
     public FinishSessionCommand toCommand(UUID sessionId, UUID userId) {
         List<ExerciseLogCommand> logs = exerciseLogs.stream().map(ExerciseLogRequest::toCommand).toList();
-        return new FinishSessionCommand(sessionId, userId, overallFeeling, logs);
+        return new FinishSessionCommand(sessionId, userId, overallFeeling, logs, endTime);
     }
 
     public record ExerciseLogRequest(

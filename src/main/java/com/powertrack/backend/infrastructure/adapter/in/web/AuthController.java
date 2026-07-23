@@ -2,10 +2,12 @@ package com.powertrack.backend.infrastructure.adapter.in.web;
 
 import com.powertrack.backend.application.auth.port.in.AuthenticateUserUseCase;
 import com.powertrack.backend.application.auth.port.in.AuthenticateUserUseCase.LoginCommand;
+import com.powertrack.backend.application.auth.port.in.RefreshAccessTokenUseCase;
 import com.powertrack.backend.application.auth.port.in.RegisterUserUseCase;
 import com.powertrack.backend.application.auth.port.in.RegisterUserUseCase.RegisterCommand;
 import com.powertrack.backend.infrastructure.adapter.in.web.dto.AuthResponse;
 import com.powertrack.backend.infrastructure.adapter.in.web.dto.LoginRequest;
+import com.powertrack.backend.infrastructure.adapter.in.web.dto.RefreshTokenRequest;
 import com.powertrack.backend.infrastructure.adapter.in.web.dto.RegisterRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -21,10 +23,13 @@ public class AuthController {
 
     private final RegisterUserUseCase registerUserUseCase;
     private final AuthenticateUserUseCase authenticateUserUseCase;
+    private final RefreshAccessTokenUseCase refreshAccessTokenUseCase;
 
-    public AuthController(RegisterUserUseCase registerUserUseCase, AuthenticateUserUseCase authenticateUserUseCase) {
+    public AuthController(RegisterUserUseCase registerUserUseCase, AuthenticateUserUseCase authenticateUserUseCase,
+                           RefreshAccessTokenUseCase refreshAccessTokenUseCase) {
         this.registerUserUseCase = registerUserUseCase;
         this.authenticateUserUseCase = authenticateUserUseCase;
+        this.refreshAccessTokenUseCase = refreshAccessTokenUseCase;
     }
 
     @PostMapping("/register")
@@ -37,6 +42,12 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
         var result = authenticateUserUseCase.authenticate(new LoginCommand(request.email(), request.password()));
+        return ResponseEntity.ok(AuthResponse.from(result));
+    }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<AuthResponse> refresh(@Valid @RequestBody RefreshTokenRequest request) {
+        var result = refreshAccessTokenUseCase.refresh(request.refreshToken());
         return ResponseEntity.ok(AuthResponse.from(result));
     }
 }

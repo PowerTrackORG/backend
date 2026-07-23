@@ -2,6 +2,7 @@ package com.powertrack.backend.infrastructure.adapter.in.web;
 
 import com.powertrack.backend.application.auth.exception.EmailAlreadyRegisteredException;
 import com.powertrack.backend.application.auth.exception.InvalidCredentialsException;
+import com.powertrack.backend.application.auth.exception.InvalidRefreshTokenException;
 import com.powertrack.backend.application.routine.exception.ExerciseNotFoundException;
 import com.powertrack.backend.application.routine.exception.RoutineNotFoundException;
 import com.powertrack.backend.application.workout.exception.RoutineDayNotFoundException;
@@ -29,6 +30,11 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(InvalidCredentialsException.class)
     public ResponseEntity<Map<String, Object>> handleInvalidCredentials(InvalidCredentialsException ex) {
+        return errorResponse(HttpStatus.UNAUTHORIZED, ex.getMessage());
+    }
+
+    @ExceptionHandler(InvalidRefreshTokenException.class)
+    public ResponseEntity<Map<String, Object>> handleInvalidRefreshToken(InvalidRefreshTokenException ex) {
         return errorResponse(HttpStatus.UNAUTHORIZED, ex.getMessage());
     }
 

@@ -46,8 +46,14 @@ public final class WorkoutSession {
         this.logs = List.copyOf(logs);
     }
 
-    public static WorkoutSession start(UUID userId, UUID routineDayId) {
-        return new WorkoutSession(UUID.randomUUID(), userId, routineDayId, Instant.now(), null,
+    /**
+     * {@code id} y {@code startTime} los genera/reporta el cliente (no el servidor): así
+     * iniciar una sesión es idempotente al sincronizar desde modo offline, y la fecha
+     * refleja cuándo se entrenó realmente, no cuándo llegó la sincronización. Ver
+     * {@code Docs/decisiones-tecnicas.md}, entrada 2026-07-23.
+     */
+    public static WorkoutSession start(UUID id, UUID userId, UUID routineDayId, Instant startTime) {
+        return new WorkoutSession(id, userId, routineDayId, startTime, null,
                 SessionStatus.IN_PROGRESS, null, List.of());
     }
 
@@ -66,12 +72,13 @@ public final class WorkoutSession {
      * ({@code FinishWorkoutSessionService}), que debe comprobar el estado ANTES de
      * invocar este método.
      */
-    public WorkoutSession finish(OverallFeeling overallFeeling, List<WorkoutLog> logs) {
+    public WorkoutSession finish(OverallFeeling overallFeeling, List<WorkoutLog> logs, Instant endTime) {
         if (status != SessionStatus.IN_PROGRESS) {
             throw new IllegalStateException("Solo una sesión IN_PROGRESS puede finalizarse");
         }
         Objects.requireNonNull(overallFeeling, "overallFeeling es obligatorio al finalizar la sesión");
-        return new WorkoutSession(id, userId, routineDayId, startTime, Instant.now(), SessionStatus.COMPLETED,
+        Objects.requireNonNull(endTime, "endTime es obligatorio al finalizar la sesión");
+        return new WorkoutSession(id, userId, routineDayId, startTime, endTime, SessionStatus.COMPLETED,
                 overallFeeling, logs);
     }
 

@@ -35,6 +35,11 @@ public class RoutinePersistenceAdapter implements RoutineRepositoryPort {
     }
 
     @Override
+    public boolean existsById(UUID id) {
+        return jpaRepository.existsById(id);
+    }
+
+    @Override
     public List<RoutineSummary> findSummariesByUserId(UUID userId) {
         return jpaRepository.findSummariesByUserId(userId).stream()
                 .map(projection -> new RoutineSummary(projection.getId(), projection.getName(),

@@ -12,8 +12,12 @@ public interface FinishWorkoutSessionUseCase {
 
     FinishSessionResult finish(FinishSessionCommand command);
 
+    /**
+     * {@code endTime} lo reporta el cliente (no el servidor): ver
+     * {@link com.powertrack.backend.domain.workout.WorkoutSession#finish}.
+     */
     record FinishSessionCommand(UUID sessionId, UUID userId, OverallFeeling overallFeeling,
-                                 List<ExerciseLogCommand> exerciseLogs) {
+                                 List<ExerciseLogCommand> exerciseLogs, Instant endTime) {
     }
 
     record ExerciseLogCommand(UUID routineExerciseId, String notes, List<SetCommand> sets) {

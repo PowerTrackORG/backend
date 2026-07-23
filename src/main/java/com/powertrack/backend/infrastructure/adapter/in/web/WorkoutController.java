@@ -46,7 +46,7 @@ public class WorkoutController {
     @PostMapping("/session/start")
     public ResponseEntity<StartWorkoutSessionResponse> start(@Valid @RequestBody StartWorkoutSessionRequest request) {
         UUID userId = CurrentUserResolver.currentUserId();
-        var result = startWorkoutSessionUseCase.start(userId, request.routineDayId());
+        var result = startWorkoutSessionUseCase.start(request.toCommand(userId));
         return ResponseEntity.status(HttpStatus.CREATED).body(StartWorkoutSessionResponse.from(result));
     }
 

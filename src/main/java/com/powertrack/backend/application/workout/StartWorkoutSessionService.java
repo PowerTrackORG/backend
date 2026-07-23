@@ -7,7 +7,7 @@ import com.powertrack.backend.application.workout.port.out.WorkoutSessionReposit
 import com.powertrack.backend.domain.workout.WorkoutSession;
 import org.springframework.stereotype.Service;
 
-import java.util.UUID;
+import java.util.Optional;
 
 @Service
 public class StartWorkoutSessionService implements StartWorkoutSessionUseCase {
@@ -22,14 +22,28 @@ public class StartWorkoutSessionService implements StartWorkoutSessionUseCase {
     }
 
     @Override
-    public StartedSessionResult start(UUID userId, UUID routineDayId) {
-        // Reutiliza el ownership check ya existente del módulo de Rutinas en vez de
-        // duplicar la lógica de pertenencia (routineDay -> routine -> userId).
-        if (!routineRepository.existsRoutineDayOwnedByUser(routineDayId, userId)) {
-            throw new RoutineDayNotFoundException(routineDayId);
+    public StartedSessionResult start(StartSessionCommand command) {
+        // Idempotencia de sync offline: si este sessionId (generado por el cliente) ya
+        // fue iniciado por este mismo usuario, es un reintento — se devuelve tal cual sin
+        // volver a insertar. Ver Docs/decisiones-tecnicas.md, 2026-07-23.
+        Optional<WorkoutSession> existing = workoutSessionRepository.findByIdAndUserId(command.sessionId(), command.userId());
+        if (existing.isPresent()) {
+            WorkoutSession session = existing.get();
+            return new StartedSessionResult(session.getId(), session.getRoutineDayId(), session.getStartTime());
+        }
+        // El sessionId existe pero pertenece a otro usuario: colisión real, se rechaza.
+        if (workoutSessionRepository.existsById(command.sessionId())) {
+            throw new IllegalArgumentException("sessionId ya está en uso");
         }
 
-        WorkoutSession session = WorkoutSession.start(userId, routineDayId);
+        // Reutiliza el ownership check ya existente del módulo de Rutinas en vez de
+        // duplicar la lógica de pertenencia (routineDay -> routine -> userId).
+        if (!routineRepository.existsRoutineDayOwnedByUser(command.routineDayId(), command.userId())) {
+            throw new RoutineDayNotFoundException(command.routineDayId());
+        }
+
+        WorkoutSession session = WorkoutSession.start(command.sessionId(), command.userId(), command.routineDayId(),
+                command.startTime());
         WorkoutSession saved = workoutSessionRepository.save(session);
 
         return new StartedSessionResult(saved.getId(), saved.getRoutineDayId(), saved.getStartTime());

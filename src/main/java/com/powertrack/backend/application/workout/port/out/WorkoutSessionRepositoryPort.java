@@ -15,4 +15,12 @@ public interface WorkoutSessionRepositoryPort {
      * {@code RoutineRepositoryPort#findByIdAndUserId}.
      */
     Optional<WorkoutSession> findByIdAndUserId(UUID id, UUID userId);
+
+    /**
+     * Chequeo de colisión de ID sin filtro de dueño, mismo propósito que
+     * {@code RoutineRepositoryPort#existsById}: distinguir un reintento idempotente
+     * (mismo dueño) de una colisión real (otro dueño) al iniciar sesión con un
+     * {@code sessionId} generado por el cliente.
+     */
+    boolean existsById(UUID id);
 }

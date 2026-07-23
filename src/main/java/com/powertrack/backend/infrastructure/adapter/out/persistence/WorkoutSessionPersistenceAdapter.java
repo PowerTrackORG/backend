@@ -34,6 +34,11 @@ public class WorkoutSessionPersistenceAdapter implements WorkoutSessionRepositor
         return jpaRepository.findByIdAndUserId(id, userId).map(this::toDomain);
     }
 
+    @Override
+    public boolean existsById(UUID id) {
+        return jpaRepository.existsById(id);
+    }
+
     private WorkoutSessionJpaEntity toEntity(WorkoutSession session) {
         WorkoutSessionJpaEntity entity = new WorkoutSessionJpaEntity(session.getId(), session.getUserId(),
                 session.getRoutineDayId(), session.getStartTime(), session.getEndTime(), session.getStatus(),

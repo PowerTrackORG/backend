@@ -15,6 +15,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Date;
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * Adaptador de salida: implementa TokenProviderPort con jjwt (HMAC-SHA256, RNF-03).
@@ -80,5 +81,12 @@ public class JwtTokenAdapter implements TokenProviderPort {
 
     public boolean isAccessToken(Claims claims) {
         return TYPE_ACCESS.equals(claims.get(CLAIM_TYPE, String.class));
+    }
+
+    @Override
+    public Optional<UUID> validateRefreshTokenAndGetUserId(String refreshToken) {
+        return parseClaims(refreshToken)
+                .filter(claims -> TYPE_REFRESH.equals(claims.get(CLAIM_TYPE, String.class)))
+                .map(claims -> UUID.fromString(claims.getSubject()));
     }
 }

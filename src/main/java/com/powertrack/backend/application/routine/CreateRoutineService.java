@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -28,6 +29,25 @@ public class CreateRoutineService implements CreateRoutineUseCase {
 
     @Override
     public RoutineDetailResult create(CreateRoutineCommand command) {
+        // Idempotencia de sync offline: si este routineId (generado por el cliente) ya
+        // fue creado por este mismo usuario, es un reintento — se devuelve tal cual sin
+        // volver a insertar ni pisar cambios. Ver Docs/decisiones-tecnicas.md, 2026-07-23.
+        Optional<Routine> existing = routineRepository.findByIdAndUserId(command.routineId(), command.userId());
+        if (existing.isPresent()) {
+            List<UUID> existingExerciseIds = existing.get().getDays().stream()
+                    .flatMap(day -> day.getExercises().stream())
+                    .map(RoutineExercise::getExerciseId)
+                    .distinct()
+                    .toList();
+            return RoutineMapper.toDetailResult(existing.get(), exerciseRepository.findAllByIds(existingExerciseIds));
+        }
+        // El routineId existe pero pertenece a otro usuario: colisión real (o bug de
+        // cliente), no un reintento legítimo — se rechaza en vez de sobreescribir datos
+        // ajenos.
+        if (routineRepository.existsById(command.routineId())) {
+            throw new IllegalArgumentException("routineId ya está en uso");
+        }
+
         List<UUID> exerciseIds = command.days().stream()
                 .flatMap(day -> day.exercises().stream())
                 .map(RoutineExerciseCommand::exerciseId)
@@ -45,7 +65,7 @@ public class CreateRoutineService implements CreateRoutineUseCase {
                 .map(this::toDomainDay)
                 .toList();
 
-        Routine routine = Routine.create(command.userId(), command.name(), command.description(), days);
+        Routine routine = Routine.create(command.routineId(), command.userId(), command.name(), command.description(), days);
         Routine saved = routineRepository.save(routine);
 
         return RoutineMapper.toDetailResult(saved, exercisesById);

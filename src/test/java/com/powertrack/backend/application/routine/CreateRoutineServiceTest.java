@@ -9,6 +9,8 @@ import com.powertrack.backend.application.routine.port.out.ExerciseRepositoryPor
 import com.powertrack.backend.application.routine.port.out.RoutineRepositoryPort;
 import com.powertrack.backend.domain.routine.Exercise;
 import com.powertrack.backend.domain.routine.Routine;
+import com.powertrack.backend.domain.routine.RoutineDay;
+import com.powertrack.backend.domain.routine.RoutineExercise;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -16,8 +18,10 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -45,12 +49,13 @@ class CreateRoutineServiceTest {
     @Test
     void creaUnaRutinaConDiasYEjerciciosYDevuelveElDetalleEnriquecidoConNombres() {
         UUID userId = UUID.randomUUID();
+        UUID routineId = UUID.randomUUID();
         UUID exerciseId = UUID.randomUUID();
         Exercise benchPress = Exercise.rehydrate(exerciseId, "Press banca", "Pecho", "Empuje", null);
 
         RoutineExerciseCommand exerciseCommand = new RoutineExerciseCommand(exerciseId, 0, 4, 8, 12, 90, "Cuidar la técnica");
         RoutineDayCommand dayCommand = new RoutineDayCommand("Día A", 0, List.of(exerciseCommand));
-        CreateRoutineCommand command = new CreateRoutineCommand(userId, "Heavy Duty", "Rutina de fuerza", List.of(dayCommand));
+        CreateRoutineCommand command = new CreateRoutineCommand(routineId, userId, "Heavy Duty", "Rutina de fuerza", List.of(dayCommand));
 
         when(exerciseRepository.findAllByIds(List.of(exerciseId))).thenReturn(Map.of(exerciseId, benchPress));
         when(routineRepository.save(any(Routine.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -79,16 +84,64 @@ class CreateRoutineServiceTest {
     @Test
     void rechazaLaCreacionSiUnEjercicioReferenciadoNoExisteYNoGuardaNada() {
         UUID userId = UUID.randomUUID();
+        UUID routineId = UUID.randomUUID();
         UUID exerciseId = UUID.randomUUID();
 
         RoutineExerciseCommand exerciseCommand = new RoutineExerciseCommand(exerciseId, 0, 4, 8, 12, 90, null);
         RoutineDayCommand dayCommand = new RoutineDayCommand("Día A", 0, List.of(exerciseCommand));
-        CreateRoutineCommand command = new CreateRoutineCommand(userId, "Heavy Duty", null, List.of(dayCommand));
+        CreateRoutineCommand command = new CreateRoutineCommand(routineId, userId, "Heavy Duty", null, List.of(dayCommand));
 
         when(exerciseRepository.findAllByIds(List.of(exerciseId))).thenReturn(Map.of());
 
         assertThatThrownBy(() -> service.create(command))
                 .isInstanceOf(ExerciseNotFoundException.class);
+
+        verify(routineRepository, never()).save(any());
+    }
+
+    @Test
+    void reintentoDeSyncConElMismoRoutineIdDevuelveLoYaCreadoSinReinsertar() {
+        // Idempotencia offline: mismo routineId, mismo usuario -> se asume un reintento
+        // de sincronización y se devuelve lo ya persistido, sin volver a guardar.
+        UUID userId = UUID.randomUUID();
+        UUID routineId = UUID.randomUUID();
+        UUID exerciseId = UUID.randomUUID();
+        Exercise benchPress = Exercise.rehydrate(exerciseId, "Press banca", "Pecho", "Empuje", null);
+
+        RoutineExercise existingExercise = RoutineExercise.rehydrate(UUID.randomUUID(), exerciseId, 0, 4, 8, 12, 90, null);
+        RoutineDay existingDay = RoutineDay.rehydrate(UUID.randomUUID(), "Día A", 0, List.of(existingExercise));
+        Routine existingRoutine = Routine.rehydrate(routineId, userId, "Heavy Duty", "Rutina de fuerza",
+                Instant.now(), List.of(existingDay));
+
+        RoutineExerciseCommand exerciseCommand = new RoutineExerciseCommand(exerciseId, 0, 4, 8, 12, 90, null);
+        RoutineDayCommand dayCommand = new RoutineDayCommand("Día A", 0, List.of(exerciseCommand));
+        CreateRoutineCommand command = new CreateRoutineCommand(routineId, userId, "Heavy Duty", "Rutina de fuerza", List.of(dayCommand));
+
+        when(routineRepository.findByIdAndUserId(routineId, userId)).thenReturn(Optional.of(existingRoutine));
+        when(exerciseRepository.findAllByIds(List.of(exerciseId))).thenReturn(Map.of(exerciseId, benchPress));
+
+        RoutineDetailResult result = service.create(command);
+
+        assertThat(result.id()).isEqualTo(routineId);
+        assertThat(result.days()).hasSize(1);
+        verify(routineRepository, never()).save(any());
+    }
+
+    @Test
+    void rechazaLaCreacionSiElRoutineIdYaPerteneceAOtroUsuario() {
+        UUID userId = UUID.randomUUID();
+        UUID routineId = UUID.randomUUID();
+        UUID exerciseId = UUID.randomUUID();
+
+        RoutineExerciseCommand exerciseCommand = new RoutineExerciseCommand(exerciseId, 0, 4, 8, 12, 90, null);
+        RoutineDayCommand dayCommand = new RoutineDayCommand("Día A", 0, List.of(exerciseCommand));
+        CreateRoutineCommand command = new CreateRoutineCommand(routineId, userId, "Heavy Duty", null, List.of(dayCommand));
+
+        when(routineRepository.findByIdAndUserId(routineId, userId)).thenReturn(Optional.empty());
+        when(routineRepository.existsById(routineId)).thenReturn(true);
+
+        assertThatThrownBy(() -> service.create(command))
+                .isInstanceOf(IllegalArgumentException.class);
 
         verify(routineRepository, never()).save(any());
     }

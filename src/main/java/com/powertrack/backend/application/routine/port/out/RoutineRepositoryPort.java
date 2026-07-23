@@ -13,6 +13,13 @@ public interface RoutineRepositoryPort {
 
     Optional<Routine> findByIdAndUserId(UUID id, UUID userId);
 
+    /**
+     * Chequeo de colisión de ID sin filtro de dueño: usado al crear una rutina con un ID
+     * generado por el cliente, para distinguir "ya existe y es mía" (idempotencia de
+     * sync) de "ya existe y es de otro usuario" (colisión real, se rechaza).
+     */
+    boolean existsById(UUID id);
+
     List<RoutineSummary> findSummariesByUserId(UUID userId);
 
     /**

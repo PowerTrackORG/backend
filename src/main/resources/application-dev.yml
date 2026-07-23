@@ -14,7 +14,9 @@ jwt:
   # Solo para desarrollo local. En cualquier otro ambiente esto DEBE venir de una variable de entorno real.
   secret: ${JWT_SECRET:dev-only-insecure-secret-change-me-please-32chars-min}
   access-token-expiration-minutes: 15
-  refresh-token-expiration-days: 30
+  # 90 días (antes 30): colchón para el diseño offline-first — un usuario puede pasar
+  # semanas sin señal en el gimnasio y el login debe seguir sirviendo cuando vuelva a sincronizar.
+  refresh-token-expiration-days: 90
 
 server:
   # 8080 default cambiado a 8081: en esta máquina de desarrollo el 8080 lo ocupa

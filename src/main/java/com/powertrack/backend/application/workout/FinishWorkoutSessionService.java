@@ -89,7 +89,7 @@ public class FinishWorkoutSessionService implements FinishWorkoutSessionUseCase 
                     recommendation.defaultMessage()));
         }
 
-        WorkoutSession finished = session.finish(command.overallFeeling(), logs);
+        WorkoutSession finished = session.finish(command.overallFeeling(), logs, command.endTime());
         WorkoutSession saved = workoutSessionRepository.save(finished);
 
         return new FinishSessionResult(saved.getId(), saved.getStartTime(), saved.getEndTime(),

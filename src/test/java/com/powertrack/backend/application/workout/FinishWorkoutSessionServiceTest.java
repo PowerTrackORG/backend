@@ -57,7 +57,7 @@ class FinishWorkoutSessionServiceTest {
     void lanzaWorkoutSessionNotFoundCuandoLaSesionNoExisteOPerteneceAOtroUsuario() {
         UUID userId = UUID.randomUUID();
         UUID sessionId = UUID.randomUUID();
-        FinishSessionCommand command = new FinishSessionCommand(sessionId, userId, OverallFeeling.BUENA, List.of());
+        FinishSessionCommand command = new FinishSessionCommand(sessionId, userId, OverallFeeling.BUENA, List.of(), Instant.now());
 
         when(workoutSessionRepository.findByIdAndUserId(sessionId, userId)).thenReturn(Optional.empty());
 
@@ -71,10 +71,10 @@ class FinishWorkoutSessionServiceTest {
     void lanzaWorkoutSessionAlreadyFinishedCuandoLaSesionYaEstaCompletada() {
         UUID userId = UUID.randomUUID();
         UUID routineDayId = UUID.randomUUID();
-        WorkoutSession inProgress = WorkoutSession.start(userId, routineDayId);
-        WorkoutSession alreadyFinished = inProgress.finish(OverallFeeling.BUENA, List.of());
+        WorkoutSession inProgress = WorkoutSession.start(UUID.randomUUID(), userId, routineDayId, Instant.now());
+        WorkoutSession alreadyFinished = inProgress.finish(OverallFeeling.BUENA, List.of(), Instant.now());
 
-        FinishSessionCommand command = new FinishSessionCommand(alreadyFinished.getId(), userId, OverallFeeling.BUENA, List.of());
+        FinishSessionCommand command = new FinishSessionCommand(alreadyFinished.getId(), userId, OverallFeeling.BUENA, List.of(), Instant.now());
 
         when(workoutSessionRepository.findByIdAndUserId(alreadyFinished.getId(), userId)).thenReturn(Optional.of(alreadyFinished));
 
@@ -89,11 +89,11 @@ class FinishWorkoutSessionServiceTest {
         UUID userId = UUID.randomUUID();
         UUID routineDayId = UUID.randomUUID();
         UUID routineExerciseId = UUID.randomUUID();
-        WorkoutSession inProgress = WorkoutSession.start(userId, routineDayId);
+        WorkoutSession inProgress = WorkoutSession.start(UUID.randomUUID(), userId, routineDayId, Instant.now());
 
         ExerciseLogCommand exerciseLog = new ExerciseLogCommand(routineExerciseId, null,
                 List.of(new SetCommand(1, BigDecimal.valueOf(100), 10, 8)));
-        FinishSessionCommand command = new FinishSessionCommand(inProgress.getId(), userId, OverallFeeling.BUENA, List.of(exerciseLog));
+        FinishSessionCommand command = new FinishSessionCommand(inProgress.getId(), userId, OverallFeeling.BUENA, List.of(exerciseLog), Instant.now());
 
         when(workoutSessionRepository.findByIdAndUserId(inProgress.getId(), userId)).thenReturn(Optional.of(inProgress));
         when(routineRepository.findRoutineExerciseTargets(routineExerciseId, userId)).thenReturn(Optional.empty());
@@ -108,7 +108,7 @@ class FinishWorkoutSessionServiceTest {
     void finalizaLaSesionYDevuelveUnaSugerenciaDistintaPorEjercicioSegunElMotorDeReglas() {
         UUID userId = UUID.randomUUID();
         UUID routineDayId = UUID.randomUUID();
-        WorkoutSession inProgress = WorkoutSession.start(userId, routineDayId);
+        WorkoutSession inProgress = WorkoutSession.start(UUID.randomUUID(), userId, routineDayId, Instant.now());
 
         UUID benchPressId = UUID.randomUUID();
         UUID squatId = UUID.randomUUID();
@@ -128,7 +128,7 @@ class FinishWorkoutSessionServiceTest {
                         new SetCommand(4, BigDecimal.valueOf(80), 9, 9)));
 
         FinishSessionCommand command = new FinishSessionCommand(inProgress.getId(), userId, OverallFeeling.BUENA,
-                List.of(benchPressLog, squatLog));
+                List.of(benchPressLog, squatLog), Instant.now());
 
         when(workoutSessionRepository.findByIdAndUserId(inProgress.getId(), userId)).thenReturn(Optional.of(inProgress));
         when(routineRepository.findRoutineExerciseTargets(eq(benchPressId), eq(userId)))
@@ -165,11 +165,11 @@ class FinishWorkoutSessionServiceTest {
         UUID userId = UUID.randomUUID();
         UUID routineDayId = UUID.randomUUID();
         UUID routineExerciseId = UUID.randomUUID();
-        WorkoutSession inProgress = WorkoutSession.start(userId, routineDayId);
+        WorkoutSession inProgress = WorkoutSession.start(UUID.randomUUID(), userId, routineDayId, Instant.now());
 
         ExerciseLogCommand log = new ExerciseLogCommand(routineExerciseId, null,
                 List.of(new SetCommand(1, BigDecimal.valueOf(100), 12, 7)));
-        FinishSessionCommand command = new FinishSessionCommand(inProgress.getId(), userId, OverallFeeling.BUENA, List.of(log));
+        FinishSessionCommand command = new FinishSessionCommand(inProgress.getId(), userId, OverallFeeling.BUENA, List.of(log), Instant.now());
 
         when(workoutSessionRepository.findByIdAndUserId(inProgress.getId(), userId)).thenReturn(Optional.of(inProgress));
         when(routineRepository.findRoutineExerciseTargets(routineExerciseId, userId))

@@ -39,8 +39,13 @@ public final class Routine {
         this.days = List.copyOf(days);
     }
 
-    public static Routine create(UUID userId, String name, String description, List<RoutineDay> days) {
-        return new Routine(UUID.randomUUID(), userId, name, description, Instant.now(), days);
+    /**
+     * El {@code id} lo genera el cliente (no el servidor): es lo que permite que crear
+     * una rutina sea una operación idempotente al sincronizar desde el modo offline — ver
+     * {@code Docs/decisiones-tecnicas.md}, entrada 2026-07-23.
+     */
+    public static Routine create(UUID id, UUID userId, String name, String description, List<RoutineDay> days) {
+        return new Routine(id, userId, name, description, Instant.now(), days);
     }
 
     public static Routine rehydrate(UUID id, UUID userId, String name, String description, Instant createdAt, List<RoutineDay> days) {

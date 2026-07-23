@@ -7,7 +7,12 @@ public interface CreateRoutineUseCase {
 
     RoutineDetailResult create(CreateRoutineCommand command);
 
-    record CreateRoutineCommand(UUID userId, String name, String description, List<RoutineDayCommand> days) {
+    /**
+     * {@code routineId} lo genera el cliente (no el servidor) para que crear una rutina
+     * sea idempotente al reintentar una sincronización offline.
+     */
+    record CreateRoutineCommand(UUID routineId, UUID userId, String name, String description,
+                                 List<RoutineDayCommand> days) {
     }
 
     record RoutineDayCommand(String dayName, int orderIndex, List<RoutineExerciseCommand> exercises) {

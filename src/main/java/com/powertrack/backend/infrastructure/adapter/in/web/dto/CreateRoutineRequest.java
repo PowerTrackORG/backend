@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.UUID;
 
 public record CreateRoutineRequest(
+        @NotNull UUID routineId,
         @NotBlank String name,
         String description,
         @NotEmpty @Valid List<RoutineDayRequest> days
@@ -22,7 +23,7 @@ public record CreateRoutineRequest(
 
     public CreateRoutineCommand toCommand(UUID userId) {
         List<RoutineDayCommand> dayCommands = days.stream().map(RoutineDayRequest::toCommand).toList();
-        return new CreateRoutineCommand(userId, name, description, dayCommands);
+        return new CreateRoutineCommand(routineId, userId, name, description, dayCommands);
     }
 
     public record RoutineDayRequest(

@@ -1,0 +1,23 @@
+# Java / Spring Boot (Gradle)
+.gradle/
+build/
+*.class
+*.jar
+!**/gradle/wrapper/gradle-wrapper.jar
+*.iml
+
+# Env / secrets
+.env
+*.env.local
+application-local.yml
+application-local.properties
+
+# IDE
+.idea/
+.vscode/
+*.swp
+.DS_Store
+/local.properties
+
+# Tooling local (config de agentes/asistente, no forma parte del entregable)
+.claude/

@@ -111,3 +111,95 @@ Registro cronológico de decisiones no obvias y desvíos respecto al PRD origina
 4. **Un `409` en `finish` durante un reintento de sync es una señal de idempotencia, no un error.** No se cambió `WorkoutSessionAlreadyFinishedException` — se documenta el contrato para que el cliente lo consuma así: la única forma de recibir ese `409` es que la sesión ya se había completado antes, así que un reintento que lo recibe debe tratarlo como éxito, no reintentar indefinidamente ni mostrar error al usuario.
 
 **Fuera de alcance, señalado explícitamente:** endpoint de sync por lote (cada endpoint es idempotente individualmente, el cliente decide cuántas veces llamarlo); el caso "rutina borrada offline con sesiones en cola que la referencian" (el cliente no debería sincronizar sesiones de una rutina que también borró offline); todo el lado mobile (no existe código Android todavía).
+
+---
+
+### 2026-07-28 — Backend: módulo Analítica y Progreso — fórmula de 1RM estimado (Epley, con calificación por rango de reps)
+
+**Contexto:** RF-07/CU-05 requieren una serie temporal de fuerza estimada por ejercicio. El PRD no fija una fórmula.
+
+**Decisión:** 1RM estimado con la fórmula de **Epley**: `1RM = peso × (1 + reps/30)`, implementada en `domain/workout/OneRepMaxCalculator.java`. Solo se calcula sobre series (`SetSample`) con `repsCompleted` entre 1 y 12 inclusive (`OneRepMaxCalculator.qualifies()`); fuera de ese rango la serie no participa del cálculo de 1RM (sí participa igual del cálculo de volumen, que no tiene esta restricción).
+
+**Motivo:** fuera del rango 1-12 reps, el margen de error de cualquier fórmula de estimación de 1RM crece demasiado para ser una referencia confiable de fuerza máxima. Fundamentado por `fitness-science-expert`.
+
+---
+
+### 2026-07-28 — Backend: módulo Analítica y Progreso — selección de la "serie de referencia" por 1RM estimado, no por peso máximo
+
+**Contexto:** cada punto de la serie temporal por ejercicio y cada snapshot de sesión (endpoint "por rutina") necesitan reducir todas las series de una sesión a una sola "serie representativa" (`referenceSet`).
+
+**Decisión:** entre las series que califican para 1RM (1-12 reps), se elige la de **mayor 1RM estimado**, no la de mayor peso levantado. Si ninguna serie de la sesión califica (típico en objetivos de resistencia con reps altas), `referenceSet` cae a la de mayor peso y `estimated1RM` de ese punto queda `null` — no se fuerza una estimación de 1RM sobre datos donde la fórmula no es confiable. Implementado en `domain/analytics/SessionPerformanceAggregator.java`.
+
+**Motivo:** usar "peso máximo" como proxy subestimaría sistemáticamente a quien entrena con reps moderadas — ej. 100kg×1 da e1RM≈103.3kg pero 90kg×5 da e1RM=105kg; la segunda serie representa mejor la fuerza real aunque su peso absoluto sea menor.
+
+---
+
+### 2026-07-28 — Backend: módulo Analítica y Progreso — "volumen" en el MVP es tonelaje simple, no volumen efectivo
+
+**Contexto:** el PRD §18.2 (Fase 2) menciona "volumen efectivo" (conteo de series en rango RIR bajo, comparado contra 10-20 series/semana por grupo muscular) como métrica futura.
+
+**Decisión:** el MVP implementa únicamente **tonelaje simple**: Σ peso×reps de TODAS las series, sin excluir por rango de reps ni ponderar por RPE (`SessionPerformanceAggregator`, `AnalyticsRepositoryPort#sumVolumeByMuscleGroup`/`sumVolumeForRoutine`).
+
+**Motivo:** "volumen efectivo" es explícitamente una métrica de Fase 2 en el PRD y requiere una definición operacional de "serie efectiva" (umbral de RIR) no especificada para el MVP. No se implementa acá; queda como candidato de Fase 2, no como omisión accidental.
+
+---
+
+### 2026-07-28 — Backend: módulo Analítica y Progreso — limitación aceptada en la agregación por grupo muscular
+
+**Contexto:** `GET /analytics/muscle-group` agrega tonelaje por `Exercise.targetMuscle`, que es un solo string por ejercicio (sin músculos secundarios).
+
+**Decisión (consciente, no se cambia el modelo de datos en el MVP):** ejercicios compuestos (press banca, peso muerto) asignan el 100% de su tonelaje a un solo músculo, subestimando sistemáticamente el volumen real de músculos secundarios (tríceps, glúteos, etc.). Además, el tonelaje como unidad está dominado por levantamientos de carga absoluta alta (piernas/espalda) frente a ejercicios de aislamiento (brazos), lo que puede hacer parecer desbalanceado un entrenamiento que no lo está.
+
+**Motivo:** re-clasificar el catálogo de ejercicios con músculos secundarios es un cambio de modelo de datos no trivial (afecta seed y catálogo personalizado); se acepta la limitación para el MVP y se señala como candidato de Fase 2.
+
+---
+
+### 2026-07-28 — Backend: módulo Analítica y Progreso — ventanas temporales por defecto, distintas por endpoint
+
+**Contexto:** los 3 endpoints de `/analytics` aceptan `from`/`to` opcionales, pero cada uno responde una pregunta de negocio distinta cuando se omiten.
+
+**Decisión:** default de **histórico completo** para `GET /analytics/exercise/{id}` (`GetExerciseAnalyticsService`, `Instant.EPOCH` a `Instant.now()`); **7 días** para `GET /analytics/muscle-group` (`GetMuscleGroupVolumeService`); **30 días** para `GET /analytics/routine/{routineId}` (`GetRoutineAnalyticsService`). Las 3 aceptan override vía `from`/`to`.
+
+**Motivo:** no es una elección arbitraria de implementación sino de producto — `exercise` responde "¿cuál es mi tendencia de fuerza a largo plazo?" (necesita todo el histórico), `muscle-group` responde "¿estoy balanceando esta semana?" (corto plazo), `routine` responde "¿estoy sosteniendo el programa?" (mediano plazo).
+
+---
+
+### 2026-07-28 — Backend: módulo Analítica y Progreso — "adherencia vs. plan" no es calculable, solo frecuencia observada
+
+**Contexto:** `GET /analytics/routine/{routineId}` (CU-05, vista "por rutina") podría interpretarse como reportando adherencia contra el plan de entrenamiento del usuario.
+
+**Decisión:** el endpoint entrega frecuencia **observada** (`window.completedSessions`, `window.averageDaysBetweenSessions`), no cumplimiento contra un plan. No se calcula "adherencia" real.
+
+**Motivo:** `Routine`/`RoutineDay` no tienen ningún campo de frecuencia planificada (ej. "3x por semana") en el modelo actual — no hay contra qué comparar. Señalado como gap de modelo, no resuelto en este alcance; si se quiere adherencia real a futuro, hace falta agregar ese campo a `Routine`.
+
+---
+
+### 2026-07-28 — Backend: módulo Analítica y Progreso — `ProgressClassifier` compara 3 ejes sin combinarlos en un score único, y reusa el patrón de gap ya documentado en `ProgressionRuleEngine`
+
+**Contexto:** `GET /analytics/routine/{routineId}` necesita clasificar la evolución de cada ejercicio (`PROGRESSED|MAINTAINED|REGRESSED|INSUFFICIENT_DATA`) comparando la `referenceSet` de las 2 sesiones `COMPLETED` más recientes de un mismo `routineExerciseId`.
+
+**Decisión:** `domain/analytics/ProgressClassifier.java` compara peso, reps y RPE por separado, sin ponderarlos en un score compuesto. De las 27 combinaciones posibles de (peso↑/=/↓)×(reps↑/=/↓)×(RPE↑/=/↓), 5 no caen literalmente en las 3 reglas definidas (todas comparten que el peso subió pero el RPE también subió y/o las reps bajaron — ej. peso↑ 105kg, reps↓ de 8 a 5, RPE↑ de 8 a 10). En esos 5 casos se devuelve `MAINTAINED` por defecto, documentado explícitamente en el Javadoc de la clase.
+
+**Motivo:** no inventar un score compuesto opaco viola el principio "Deterministic Insights, sin caja negra" del PRD §1.2, y es coherente con que `ProgressionRuleEngine` tampoco combina esos 3 ejes en un número (ver entradas 2026-07-22 y 2026-07-23 de este documento — mismo patrón de gap, misma resolución por defecto). `ProgressClassifier` es puramente descriptivo (compara 2 sesiones ya ocurridas) y **no reemplaza ni compite** con `ProgressionRuleEngine`, que sigue siendo la única fuente prescriptiva de "qué hacer la próxima sesión" contra targets fijos. El gap queda señalado para que producto decida si amerita una 4ª regla — no es bloqueante.
+
+---
+
+### 2026-07-28 — Backend: endpoint `/analytics/routine/{routineId}` agregado por decisión explícita de producto, resolviendo el mismo tipo de gap ya documentado para RF-06
+
+**Contexto:** el diseño original de API del PRD §12.6 solo listaba `GET /analytics/exercise/{id}` y `GET /analytics/muscle-group`; CU-05, en cambio, sí mencionaba "por rutina" como una de 3 vistas de historial — el mismo tipo de gap entre requisito funcional y especificación operacional ya documentado para RF-06 (ver entrada 2026-07-22 "Inconsistencia detectada en el PRD").
+
+**Decisión:** se agrega `GET /analytics/routine/{routineId}` por decisión explícita del usuario/producto (2026-07-28), con la métrica de progreso multi-eje descrita en la entrada anterior, en vez de dejarlo pendiente o fuera de alcance.
+
+**Motivo:** cerrar la brecha entre §12.6 (API) y CU-05 (caso de uso) con una implementación real en vez de dejarla señalada sin resolver.
+
+---
+
+### 2026-07-28 — Backend: módulo Analítica y Progreso sin migración Flyway nueva
+
+**Contexto:** las 3 queries de agregación de `AnalyticsRepositoryPort`/`AnalyticsPersistenceAdapter` hacen JOIN por `routine_exercise_id`/`exercise_id`/`routine_day_id` y filtran por `(user_id, status)`.
+
+**Decisión:** no se agrega ninguna migración `V5`. Todos los índices necesarios ya existían desde `V2`/`V4`. `exercises.target_muscle` no recibe índice propio: baja cardinalidad (~10 valores) sobre un resultset que ya viene filtrado por usuario y ventana de tiempo.
+
+**Motivo:** evitar over-engineering de índices sin evidencia de necesidad; se revisa si hace falta cuando haya datos reales de volumen y quejas de performance concretas (consistente con RNF-04, no una promesa de que nunca hará falta).
+
+**Verificación:** build y suite completa (84 tests) en verde, sin cambios en `db/migration/`. Excepciones reusadas sin agregar ninguna nueva: `ExerciseNotFoundException` (`GET /analytics/exercise/{id}`) y `RoutineNotFoundException` (`GET /analytics/routine/{id}`), ambas ya mapeadas a `404` en `GlobalExceptionHandler` desde el módulo Rutinas.

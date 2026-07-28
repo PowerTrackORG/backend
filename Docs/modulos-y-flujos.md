@@ -128,4 +128,62 @@ UserController.getMyProfile / updateMySportGoal
 
 ---
 
-**Próximo módulo a construir (estado real, 2026-07-22):** quedan por implementar Cardio Log (PRD §12.5) y Analítica/Progreso (PRD §12.6) — ver alcance en `Docs/propuesta-modulos-rutinas-y-registro.md`. Van a seguir el mismo patrón hexagonal ya usado en Rutinas/Registro.
+## Analítica y Progreso (backend)
+
+**Objetivo:** dar visibilidad de desempeño histórico sobre datos ya registrados en Registro/Progreso: tendencia de fuerza por ejercicio, balance de tonelaje por grupo muscular, y progreso por ejercicio dentro de una rutina (RF-07, CU-05).
+
+**Compone:** `GET /api/v1/analytics/exercise/{exerciseId}`, `GET /api/v1/analytics/muscle-group`, `GET /api/v1/analytics/routine/{routineId}` (ver `Docs/api-endpoints.md`). No agrega tablas ni migración propia — lee `workout_sessions`/`workout_logs`/`log_sets` (`V4`) y `exercises`/`routine_exercises` (`V2`/`V3`) vía `AnalyticsRepositoryPort`, con índices ya existentes.
+
+**Conexión con Rutinas y Registro/Progreso:** no duplica el motor de sugerencias (`ProgressionRuleEngine`) ni sus excepciones — reusa `ExerciseNotFoundException` (catálogo) y `RoutineNotFoundException` (ownership) tal cual las define el módulo Rutinas. El endpoint "por rutina" resuelve el ejercicio siempre vía `RoutineExercise` (mismo ancla que Registro/Progreso, ver `Docs/decisiones-tecnicas.md` entrada 2026-07-22), nunca contra `Exercise` directamente.
+
+**Dominio puro compartido por los 3 endpoints:**
+- `domain/workout/OneRepMaxCalculator` — estima 1RM (fórmula de Epley) solo sobre series con 1-12 reps.
+- `domain/analytics/SessionPerformanceAggregator` — reduce todas las series de una sesión a `SessionAggregate` (volumen total, peso máximo, promedios de reps/RPE, serie de referencia y su 1RM estimado).
+- `domain/analytics/ProgressClassifier` — compara la serie de referencia de 2 sesiones consecutivas y clasifica `PROGRESSED|MAINTAINED|REGRESSED` (nunca decide `INSUFFICIENT_DATA`, eso lo resuelve el caller según cuántas sesiones históricas hay).
+
+Las 3 clases son deterministas, sin dependencias de Spring/JPA — mismo criterio arquitectónico que `ProgressionRuleEngine`. Detalle de cada regla/decisión en `Docs/decisiones-tecnicas.md` (entradas 2026-07-28).
+
+**Flujo de datos (por ejercicio):**
+```
+GET /analytics/exercise/{exerciseId}?from&to
+  -> GetExerciseAnalyticsService
+       -> ExerciseRepositoryPort.findById  -> 404 (ExerciseNotFoundException) si no existe en el catálogo
+       -> ventana default: histórico completo (EPOCH -> now) si from/to no vienen
+       -> AnalyticsRepositoryPort.findCompletedSessionSetsForExercise(exerciseId, userId, from, to)
+            (combina en un solo punto las series de distintos routineExercise del mismo exerciseId
+             si aparecen en la misma sesión)
+       -> por cada sesión: SessionPerformanceAggregator.aggregate(sets) -> SessionAggregate
+  <- { exerciseId, exerciseName, points: [...] }  (ordenados por sessionDate ascendente)
+```
+
+**Flujo de datos (por grupo muscular):**
+```
+GET /analytics/muscle-group?from&to
+  -> GetMuscleGroupVolumeService
+       -> ventana default: últimos 7 días si from/to no vienen
+       -> AnalyticsRepositoryPort.sumVolumeByMuscleGroup(userId, from, to)  (agregación SQL directa, sin pasar por el dominio)
+  <- [{ targetMuscle, totalVolumeKg }]  (ordenado por volumen descendente)
+```
+
+**Flujo de datos (por rutina):**
+```
+GET /analytics/routine/{routineId}?from&to
+  -> GetRoutineAnalyticsService
+       -> RoutineRepositoryPort.findByIdAndUserId  -> 404 (RoutineNotFoundException) si no existe o no es del usuario
+       -> ventana default: últimos 30 días si from/to no vienen
+       -> AnalyticsRepositoryPort.sumVolumeForRoutine / findCompletedSessionEndTimesForRoutine  (acotado por from/to)
+       -> AnalyticsRepositoryPort.findLastTwoSessionsPerRoutineExercise(TODOS los routineExerciseId de la rutina, userId)
+            (SIN filtrar por from/to: la clasificación de progreso siempre mira las 2 últimas sesiones reales,
+             una sola llamada para toda la rutina para evitar N+1)
+       -> por cada RoutineDay/RoutineExercise configurado en la rutina (orderIndex, igual que RoutineDetailResponse):
+            -> si hay <2 sesiones históricas: ProgressStatus.INSUFFICIENT_DATA
+            -> si hay >=2: SessionPerformanceAggregator.aggregate() sobre cada una de las 2 últimas
+                            -> ProgressClassifier.classify(previousAggregate.referenceSet(), lastAggregate.referenceSet())
+  <- { routineId, routineName, window, totalVolumeKg, summary, byDay: [...] }
+```
+
+**Estado:** implementado (tests unitarios `SessionPerformanceAggregatorTest`, `ProgressClassifierTest`, `GetExerciseAnalyticsServiceTest`, `GetMuscleGroupVolumeServiceTest`, `GetRoutineAnalyticsServiceTest`). Build y suite completa del backend (84 tests) en verde. **Sin commitear todavía** al momento de esta entrada (2026-07-28).
+
+---
+
+**Próximo módulo a construir (estado real, 2026-07-28):** queda por implementar Cardio Log (PRD §12.5, RF-05, CU-04) — ver alcance en `Docs/propuesta-modulos-rutinas-y-registro.md`. Va a seguir el mismo patrón hexagonal ya usado en el resto de los módulos.
